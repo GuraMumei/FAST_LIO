@@ -470,18 +470,15 @@ void map_incremental()
 
 PointCloudXYZI::Ptr pcl_wait_pub(new PointCloudXYZI(500000, 1));
 PointCloudXYZI::Ptr pcl_wait_save(new PointCloudXYZI());
-void publish_frame_world(const ros::Publisher & pubLaserCloudFull)
-{
-    if(scan_pub_en)
-    {
-        PointCloudXYZI::Ptr laserCloudFullRes(dense_pub_en ? feats_undistort : feats_down_body);
+void publish_frame_world(const ros::Publisher &pubLaserCloudFull) {
+    if (scan_pub_en) {
+        PointCloudXYZI::Ptr laserCloudFullRes(dense_pub_en ? feats_undistort
+                                                           : feats_down_body);
         int size = laserCloudFullRes->points.size();
-        PointCloudXYZI::Ptr laserCloudWorld( \
-                        new PointCloudXYZI(size, 1));
+        PointCloudXYZI::Ptr laserCloudWorld(new PointCloudXYZI(size, 1));
 
-        for (int i = 0; i < size; i++)
-        {
-            RGBpointBodyToWorld(&laserCloudFullRes->points[i], \
+        for (int i = 0; i < size; i++) {
+            RGBpointBodyToWorld(&laserCloudFullRes->points[i],
                                 &laserCloudWorld->points[i]);
         }
 
@@ -490,7 +487,7 @@ void publish_frame_world(const ros::Publisher & pubLaserCloudFull)
         laserCloudmsg.header.stamp = ros::Time().fromSec(lidar_end_time);
         laserCloudmsg.header.frame_id = "camera_init";
         pubLaserCloudFull.publish(laserCloudmsg);
-        publish_count -= PUBFRAME_PERIOD;
+
     }
 
     /**************** save map ****************/
@@ -524,7 +521,7 @@ void publish_frame_world(const ros::Publisher & pubLaserCloudFull)
     }
 }
 
-void publish_frame_body(const ros::Publisher & pubLaserCloudFull_body)
+void publish_frame_body(const ros::Publisher & pubLaserCloudFull_body, const ros::Publisher &pubLaserCloudFull_lidar)
 {
     int size = feats_undistort->points.size();
     PointCloudXYZI::Ptr laserCloudIMUBody(new PointCloudXYZI(size, 1));
@@ -540,6 +537,12 @@ void publish_frame_body(const ros::Publisher & pubLaserCloudFull_body)
     laserCloudmsg.header.stamp = ros::Time().fromSec(lidar_end_time);
     laserCloudmsg.header.frame_id = "body";
     pubLaserCloudFull_body.publish(laserCloudmsg);
+
+    sensor_msgs::PointCloud2 laserCloudmsg_lidar;
+    pcl::toROSMsg(*laserCloudIMUBody, laserCloudmsg_lidar);
+    laserCloudmsg_lidar.header.stamp = ros::Time().fromSec(lidar_end_time);
+    laserCloudmsg_lidar.header.frame_id = "livox_frame";
+    pubLaserCloudFull_lidar.publish(laserCloudmsg_lidar);
     publish_count -= PUBFRAME_PERIOD;
 }
 
@@ -826,43 +829,45 @@ int main(int argc, char** argv)
     fp = fopen(pos_log_dir.c_str(),"w");
 
     ofstream fout_pre, fout_out, fout_dbg;
-    fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),ios::out);
-    fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),ios::out);
-    fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"),ios::out);
+    fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"), ios::out);
+    fout_out.open(DEBUG_FILE_DIR("mat_out.txt"), ios::out);
+    fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"), ios::out);
     if (fout_pre && fout_out)
-        cout << "~~~~"<<ROOT_DIR<<" file opened" << endl;
+        cout << "~~~~" << ROOT_DIR << " file opened" << endl;
     else
-        cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << endl;
+        cout << "~~~~" << ROOT_DIR << " doesn't exist" << endl;
 
     /*** ROS subscribe initialization ***/
-    ros::Subscriber sub_pcl = p_pre->lidar_type == AVIA ? \
-        nh.subscribe(lid_topic, 200000, livox_pcl_cbk) : \
-        nh.subscribe(lid_topic, 200000, standard_pcl_cbk);
+    ros::Subscriber sub_pcl =
+        p_pre->lidar_type == AVIA
+            ? nh.subscribe(lid_topic, 200000, livox_pcl_cbk)
+            : nh.subscribe(lid_topic, 200000, standard_pcl_cbk);
     ros::Subscriber sub_imu = nh.subscribe(imu_topic, 200000, imu_cbk);
-    ros::Publisher pubLaserCloudFull = nh.advertise<sensor_msgs::PointCloud2>
-            ("/cloud_registered", 100000);
-    ros::Publisher pubLaserCloudFull_body = nh.advertise<sensor_msgs::PointCloud2>
-            ("/cloud_registered_body", 100000);
-    ros::Publisher pubLaserCloudEffect = nh.advertise<sensor_msgs::PointCloud2>
-            ("/cloud_effected", 100000);
-    ros::Publisher pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>
-            ("/Laser_map", 100000);
-    ros::Publisher pubOdomAftMapped = nh.advertise<nav_msgs::Odometry> 
-            ("/Odometry", 100000);
-    ros::Publisher pubPath          = nh.advertise<nav_msgs::Path> 
-            ("/path", 100000);
-//------------------------------------------------------------------------------------------------------
+    ros::Publisher pubLaserCloudFull =
+        nh.advertise<sensor_msgs::PointCloud2>("/cloud_registered", 100000);
+    ros::Publisher pubLaserCloudFull_lidar =
+        nh.advertise<sensor_msgs::PointCloud2>("/cloud_registered_lidar",
+                                               100000);
+    ros::Publisher pubLaserCloudFull_body =
+        nh.advertise<sensor_msgs::PointCloud2>("/cloud_registered_body",
+                                               100000);
+    ros::Publisher pubLaserCloudEffect =
+        nh.advertise<sensor_msgs::PointCloud2>("/cloud_effected", 100000);
+    ros::Publisher pubLaserCloudMap =
+        nh.advertise<sensor_msgs::PointCloud2>("/Laser_map", 100000);
+    ros::Publisher pubOdomAftMapped =
+        nh.advertise<nav_msgs::Odometry>("/Odometry", 100000);
+    ros::Publisher pubPath = nh.advertise<nav_msgs::Path>("/path", 100000);
+    //------------------------------------------------------------------------------------------------------
     signal(SIGINT, SigHandle);
     ros::Rate rate(5000);
     bool status = ros::ok();
-    while (status)
-    {
-        if (flg_exit) break;
+    while (status) {
+        if (flg_exit)
+            break;
         ros::spinOnce();
-        if(sync_packages(Measures)) 
-        {
-            if (flg_first_scan)
-            {
+        if (sync_packages(Measures)) {
+            if (flg_first_scan) {
                 first_lidar_time = Measures.lidar_beg_time;
                 p_imu->first_lidar_time = first_lidar_time;
                 flg_first_scan = false;
@@ -972,7 +977,7 @@ int main(int argc, char** argv)
             /******* Publish points *******/
             if (path_en)                         publish_path(pubPath);
             if (scan_pub_en || pcd_save_en)      publish_frame_world(pubLaserCloudFull);
-            if (scan_pub_en && scan_body_pub_en) publish_frame_body(pubLaserCloudFull_body);
+            if (scan_pub_en && scan_body_pub_en) publish_frame_body(pubLaserCloudFull_body, pubLaserCloudFull_lidar);
             // publish_effect_world(pubLaserCloudEffect);
             // publish_map(pubLaserCloudMap);
 

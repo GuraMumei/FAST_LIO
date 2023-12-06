@@ -1,21 +1,41 @@
 <launch>
-<!-- Launch file for Livox MID360 LiDAR -->
+	<!-- Launch file for Livox MID360 LiDAR -->
 
-	<arg name="rviz" default="true" />
+	<arg name="rviz" default="false"/>
 
-	<rosparam command="load" file="$(find fast_lio)/config/mid360.yaml" />
+	<rosparam command="load" file="$(find fast_lio)/config/mid360.yaml"/>
 
 	<param name="feature_extract_enable" type="bool" value="0"/>
 	<param name="point_filter_num" type="int" value="3"/>
-	<param name="max_iteration" type="int" value="3" />
-	<param name="filter_size_surf" type="double" value="0.5" />
-	<param name="filter_size_map" type="double" value="0.5" />
-	<param name="cube_side_length" type="double" value="1000" />
-	<param name="runtime_pos_log_enable" type="bool" value="0" />
-    <node pkg="fast_lio" type="fastlio_mapping" name="laserMapping" output="screen" /> 
+	<param name="max_iteration" type="int" value="3"/>
+	<param name="filter_size_surf" type="double" value="0.15"/>
+	<param name="filter_size_map" type="double" value="0.25"/>
+	<param name="cube_side_length" type="double" value="1000"/>
+	<param name="runtime_pos_log_enable" type="bool" value="0"/>
+	<node pkg="fast_lio" type="fastlio_mapping" name="laserMapping" output="screen"/>
 
 	<group if="$(arg rviz)">
-	<node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find fast_lio)/rviz_cfg/loam_livox.rviz" />
+		<node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz"
+			  args="-d $(find fast_lio)/rviz_cfg/loam_livox.rviz"/>
 	</group>
+
+	<arg name="map" default="$(find rm_navigation)/pcd/scans.pcd"/>
+
+	<!-- loalization-->
+	<node pkg="fast_lio_localization" type="global_localization.py" name="global_localization" output="screen"/>
+
+	<!-- transform  fusion-->
+	<node pkg="fast_lio_localization" type="transform_fusion.py" name="transform_fusion" output="screen">
+		<remap from="/localization" to="/odometry"/>
+	</node>
+
+	<node pkg="tf" type="static_transform_publisher" name="first_livox_frame"
+		  args="0.103 0.004 0.271 -1.565, 0.814, 0.023 map first_livox_frame 100"/>
+
+	<!-- golbal map-->
+	<node pkg="pcl_ros" type="pcd_to_pointcloud" name="map_publisher" output="screen"
+		  args="$(arg map) 5 _frame_id:=first_livox_frame cloud_pcd:=/map">
+		<remap from="/map" to="/offline_map"/>
+	</node>
 
 </launch>
