@@ -1,39 +1,41 @@
-#include <cmath>
-#include <math.h>
-#include <deque>
-#include <mutex>
-#include <thread>
-#include <fstream>
-#include <csignal>
-#include <ros/ros.h>
-#include <so3_math.h>
+#include "std_msgs/Empty.h"
+#include "use-ikfom.hpp"
 #include <Eigen/Eigen>
+#include <cmath>
 #include <common_lib.h>
-#include <pcl/common/io.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
 #include <condition_variable>
+#include <csignal>
+#include <deque>
+#include <eigen_conversions/eigen_msg.h>
+#include <fstream>
+#include <geometry_msgs/Vector3.h>
+#include <math.h>
+#include <mutex>
 #include <nav_msgs/Odometry.h>
+#include <pcl/common/io.h>
 #include <pcl/common/transforms.h>
 #include <pcl/kdtree/kdtree_flann.h>
-#include <tf/transform_broadcaster.h>
-#include <eigen_conversions/eigen_msg.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <geometry_msgs/Vector3.h>
-#include "use-ikfom.hpp"
+#include <so3_math.h>
+#include <tf/transform_broadcaster.h>
+#include <thread>
 
 /// *************Preconfiguration
 
 #define MAX_INI_COUNT (10)
 
-const bool time_list(PointType &x, PointType &y) {return (x.curvature < y.curvature);};
+const bool time_list(PointType &x, PointType &y) {
+  return (x.curvature < y.curvature);
+};
 
 /// *************IMU Process and undistortion
-class ImuProcess
-{
- public:
+class ImuProcess {
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   ImuProcess();
@@ -352,17 +354,20 @@ void ImuProcess::Process(const MeasureGroup &meas,  esekfom::esekf<state_ikfom, 
     last_imu_   = meas.imu.back();
 
     state_ikfom imu_state = kf_state.get_x();
-    if (init_iter_num > MAX_INI_COUNT)
-    {
+    if (init_iter_num > MAX_INI_COUNT) {
       cov_acc *= pow(G_m_s2 / mean_acc.norm(), 2);
       imu_need_init_ = false;
 
       cov_acc = cov_acc_scale;
       cov_gyr = cov_gyr_scale;
       ROS_INFO("IMU Initial Done");
+      ros::NodeHandle n;
+      ros::Publisher fast_lio_init =
+          n.advertise<std_msgs::Empty>("/fast_lio_init", 10);
+      fast_lio_init.publish(std_msgs::Empty());
       // ROS_INFO("IMU Initial Done: Gravity: %.4f %.4f %.4f %.4f; state.bias_g: %.4f %.4f %.4f; acc covarience: %.8f %.8f %.8f; gry covarience: %.8f %.8f %.8f",\
       //          imu_state.grav[0], imu_state.grav[1], imu_state.grav[2], mean_acc.norm(), cov_bias_gyr[0], cov_bias_gyr[1], cov_bias_gyr[2], cov_acc[0], cov_acc[1], cov_acc[2], cov_gyr[0], cov_gyr[1], cov_gyr[2]);
-      fout_imu.open(DEBUG_FILE_DIR("imu.txt"),ios::out);
+      fout_imu.open(DEBUG_FILE_DIR("imu.txt"), ios::out);
     }
 
     return;
